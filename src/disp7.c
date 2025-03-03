@@ -7,6 +7,7 @@
 
 
 #include "disp7.h"
+#include "disp7_sweep.h"
 
 /*
  * Macros
@@ -153,4 +154,147 @@ void disp7_print_raw(disp7_t *disp7, disp7_segments_e raw){
 	assert(disp7->bInitialized == true);
 
 	__set_segments(disp7, raw);
+}
+
+/* Routiner for sweep */
+
+void disp7Sweep_init(disp7_sweep_t *Disp7Sweep){
+	assert (Disp7Sweep != NULL);
+	assert (Disp7Sweep->bInitialized == false);
+
+	Disp7Sweep->bInitialized = true;
+	Disp7Sweep->psFirstDisp = NULL;
+	Disp7Sweep->psActDisp = NULL;
+	Disp7Sweep->u32RegDisplays = 0;
+}
+
+void disp7Sweep_add_display(disp7_sweep_t *Disp7Sweep, disp7_alone_t *Display){
+	assert (Disp7Sweep != NULL);
+	assert (Disp7Sweep->bInitialized == true);
+	assert(Display != NULL);
+
+	if (Disp7Sweep->psFirstDisp == NULL){
+		Disp7Sweep->psFirstDisp = Display;
+		Disp7Sweep->psActDisp = Display;
+	}
+	else{
+		disp7_alone_t *temp;
+		temp = Disp7Sweep->psFirstDisp;
+		while(temp->_intern.next != NULL){
+			temp = temp->_intern.next;
+		}
+		temp->_intern.next = Display;
+	}
+	Display->_intern.u8Value = 0xFF;
+	Display->_intern.bDot = false;
+	Display->_intern.next = NULL;
+	Disp7Sweep->u32RegDisplays++;
+}
+
+void disp7Sweep_print_number(disp7_sweep_t *Disp7Sweep, uint32_t Number){
+	disp7_alone_t *Display;
+
+	assert (Disp7Sweep != NULL);
+	assert (Disp7Sweep->bInitialized == true);
+
+	Display = Disp7Sweep->psFirstDisp;
+	// iterate for all displays, when reachs zero, fill display with 0xff
+	// Starts on the last significant bit
+	// TODO: Implement an option to print zero on left zeroes
+	while (Display != NULL){
+		if (Number > 0){
+			Display->_intern.u8Value = Number % 10;
+			// removes less significant digit
+			Number = Number / 10;
+		}
+		else{
+			// value 0xFF will turnoff display
+			Display->_intern.u8Value = 0xFF;
+		}
+		// aways disable the dot
+		Display->_intern.bDot = false;
+		Display = (disp7_alone_t*)Display->_intern.next;
+	}
+}
+
+void Disp7Sweep_set_dot(disp7_sweep_t *Disp7Sweep, uint8_t index, bool DotEn){
+	uint8_t i;
+	disp7_alone_t *Display;
+
+	assert (Disp7Sweep != NULL);
+	assert (Disp7Sweep->bInitialized == true);
+
+	i = 0;
+	Display = Disp7Sweep->psFirstDisp;
+	while (Display != NULL && i != index ){
+		Display = (disp7_alone_t*)Display->_intern.next;
+		i++;
+	}
+	if (Display != NULL){
+		Display->_intern.bDot = DotEn;
+	}
+}
+
+void Disp7Sweep_print_string(disp7_sweep_t *Disp7Sweep, char *Str){
+	disp7_alone_t *Display;
+	size_t StrLen;
+	int8_t i;
+
+	StrLen = strlen(Str);
+
+	assert (Disp7Sweep != NULL);
+	assert (Disp7Sweep->bInitialized == true);
+	assert(Str != NULL);
+	assert(StrLen > 0);
+
+	Display = Disp7Sweep->psFirstDisp;
+	// iterate for all displays, when reachs zero, fill display with 0xff
+	// TODO: Implement an option to print zero on left zeroes
+	i = StrLen - 1;
+	while (Display != NULL){
+		// Starts for the less significant digit
+		if (i > -1){
+			if (Str[i] >= '0' && Str[i] <= '9'){
+				Display->_intern.u8Value = (uint8_t)(Str[i] - '0');
+			}
+			else{
+				Display->_intern.u8Value = 0xFF;
+			}
+		}
+		else{
+			// value 0xFF will turnoff display
+			Display->_intern.u8Value = 0xFF;
+		}
+		// check if value as a dot
+		if (Str[i] == '.' || Str[i] == ','){
+			// when detect a dot, do not go to next display
+			Display->_intern.bDot = true;
+		}
+		else{
+			Display = (disp7_alone_t*)Display->_intern.next;
+			if (Display != NULL){
+				Display->_intern.bDot = false;
+			}
+		}
+		i--;
+	}
+}
+
+void disp7Sweep_timer_interrupt(disp7_sweep_t *Disp7Sweep){
+	disp7_alone_t *Display;
+	assert (Disp7Sweep != NULL);
+
+	if (Disp7Sweep->bInitialized == false || Disp7Sweep->psActDisp == NULL){
+		return;
+	}
+
+	Display = Disp7Sweep->psActDisp;
+	Display->fxnControlDisplay(false);
+	Display = (disp7_alone_t*)Display->_intern.next;
+	if (Display == NULL){
+		Display = Disp7Sweep->psFirstDisp;
+	}
+	disp7_print_number(Display->psDisplay, Display->_intern.u8Value, Display->_intern.bDot);
+	Display->fxnControlDisplay(true);
+	Disp7Sweep->psActDisp = Display;
 }
