@@ -133,7 +133,10 @@ void disp7_print_number_from_char (disp7_t *disp7, char symbol){
 		number = symbol - '0';
 	}
 	else if (symbol >= 'A' && symbol <= 'F'){
-		number = symbol - 'A';
+		number = (symbol - 'A') + 0xA;
+	}
+	else if (symbol >= 'a' && symbol <= 'f'){
+		number = (symbol - 'a') + 0xA;
 	}
 	else if (symbol == '.' || symbol == ','){
 		number = disp7->u8Value;
@@ -141,7 +144,6 @@ void disp7_print_number_from_char (disp7_t *disp7, char symbol){
 	}
 	else{
 		number = 0xFF;
-		IsDot = disp7->bDecimalPoint;
 	}
 
 	disp7_print_number(disp7, number, IsDot);

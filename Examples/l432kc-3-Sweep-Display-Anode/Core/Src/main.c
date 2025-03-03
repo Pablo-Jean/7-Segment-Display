@@ -140,10 +140,10 @@ int main(void)
 	disp7_params_t Disp7Params;
 
 #ifdef DISP7_TEST_STRING
-	float ValueToShow = 0.0;
+	float ValueToShow = 0;
 	char StringToShow[32];
 #else
-	uint32_t ValueToShow = 0;
+	uint32_t ValueToShow = 90;
 #endif
   /* USER CODE END 1 */
 
